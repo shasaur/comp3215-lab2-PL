@@ -9,6 +9,7 @@ void waitForPcConnectString();
 void waitForPppFrame();
 void determinePacketType();
 void sendUdpData();
+void initialiseLEDs();
 
 /// PPP header
 typedef struct { // [ff 03 00 21]
@@ -141,7 +142,10 @@ typedef struct pppType {
     int online; // we hunt for a PPP connection if this is zero
     int hostIP; // ip address of host
     int fcs; // PPP "frame check sequence" - a 16-bit HDLC-like checksum used in all PPP frames
-    int ledState; // state of LED1
+    int led1State; // state of LED1
+		int led2State; // state of LED2
+		int led3State; // state of LED3
+		int led4State; // state of LED4
     int responseCounter;
     int firstFrame; // cleared after first frame
     unsigned int sum; // a checksum used in headers

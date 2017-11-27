@@ -59,12 +59,13 @@ typedef enum {
     LED_RED   = PTC1,
     LED_GREEN = PTA19,
     LED_BLUE  = PTA18,
+		LED_DEBUG = PTB0,
 
     // mbed original LED naming
     LED1 = LED_RED,
     LED2 = LED_GREEN,
     LED3 = LED_BLUE,
-    LED4 = LED_RED,
+    LED4 = LED_DEBUG,
 
     //Push buttons
     SW3 = PTC4,

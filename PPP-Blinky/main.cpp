@@ -7,6 +7,7 @@
 int main()
 {
     initializePpp(); // initialize the serial port(s) and structures
+		initialiseLEDs();
     while(1) {
         waitForPcConnectString(); // wait for PC to send a connect message
         while( connectedPpp() ) {

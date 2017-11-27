@@ -90,60 +90,27 @@ const static char rootWebPage[] = "\
 <html>\
 <head>\
 <title>mbed PPP-Blinky</title>\r\n\
-<script>\r\n\
-window.onload=function(){\
-setInterval(function(){function x(){return document.getElementById('w');};\
-x().textContent=parseInt(x().textContent)+1;},100);};\r\n\
-</script>\r\n\
-</head>\
+</head>\r\n\
 <body style=\"font-family: sans-serif; font-size:20px; text-align:center; color:#807070\">\
-<h1>mbed PPP-Blinky Up and Running</h1>\
-<h1 id=\"w\">0</h1>\
-<h1><a href=\"http://bit.ly/pppBlink2\">Source on mbed</a></h1>\
-<h1><a href=\"/ws\">WebSocket Demo</a></h1>\
-<h1><a href=\"/x\">Benchmark 1</a></h1>\
-<h1><a href=\"/xb\">Benchmark 2</a></h1>\
-<h1><a href=\"http://jsfiddle.net/d26cyuh2/\">JSFiddle Demo</a></h1>\
-</body>\
-</html>\r\n"; // size = 644 bytes plus 1 null byte = 645 bytes
-
-// this is a websocket demo html page we serve when GET /ws is requested
-/*const static char webSocketPage[] = "\
-<!DOCTYPE html>\
-<html>\
-<head>\
-<title>mbed PPP-Blinky</title>\
-<script>\
-window.onload=function(){\
- var url=\"ws://172.10.10.2\";\
- var sts=document.getElementById(\"sts\");\
- var btn=document.getElementById(\"btn\");\
- var ctr=0;\
- function show(text){sts.textContent=text;}\
- btn.onclick=function(){\
-  if(btn.textContent==\"Connect\"){\
-   x=new WebSocket(url);\
-    x.onopen=function(){\
-    show(\"Connected to : \"+url);\
-    btn.textContent=\"Send \\\"\"+ctr+\"\\\"\";\
-   };\
-  x.onclose=function(){show(\"closed\");};\
-  x.onmessage=function(msg){show(\"PPP-Blinky Sent: \\\"\"+msg.data+\"\\\"\");};\
-  } else {\
-   x.send(ctr);\
-   ctr=ctr+1;\
-   btn.textContent=\"Send \\\"\"+ctr+\"\\\"\";\
-  }\
- };\
-};\
-</script>\
-<body style=\"font-family: sans-serif; font-size:25px; color:#807070\">\
-<h1>PPP-Blinky WebSocket Test</h1>\
-<div id=\"sts\">Idle</div>\
-<button id=\"btn\" style=\"font-size: 100%; margin-top: 55px; margin-bottom: 55px;\">Connect</button>\
-<h4><a href=\"/\">PPP-Blinky home</a></h4>\
-</body>\
-</html>"; // size = 916 bytes + 1 null byte = 917 bytes*/
+<h1>Local Board Pin Control</h1>\r\n\
+<form action=\"/ll1\">\
+    <input type=\"submit\" style=\"font-size:20px\" value=\"Toggle Red (RGB)\" />\
+</form>\r\n\
+<form action=\"/ll2\">\
+    <input type=\"submit\" style=\"font-size:20px\" value=\"Toggle Green (RGB)\" />\
+</form>\r\n\
+<form action=\"/ll3\">\
+    <input type=\"submit\" style=\"font-size:20px\" value=\"Toggle Blue (RGB)\" />\
+</form>\r\n\
+<form action=\"/ll4\">\
+    <input type=\"submit\" style=\"font-size:20px\" value=\"Toggle Debug\" />\
+</form>\r\n\
+<br>\r\n\
+<form action=\"/lr\">\
+    <input type=\"submit\" style=\"font-size:20px\" value=\"Reset\" />\
+</form>\r\n\
+</body>\r\n\
+</html>\r\n";
 
 // The serial port on your mbed hardware. Your PC should be configured to view this port as a standard dial-up networking modem.
 // On Windows the model type of the modem should be selected as "Communications cable between two computers"
@@ -152,7 +119,10 @@ window.onload=function(){\
 // On a typical mbed hardware platform this serial port is a USB virtual com port (VCP) and the USB serial driver is supplied by the board vendor.
 RawSerial pc (USBTX, USBRX); // usb virtual com port for mbed hardware
 
-DigitalOut led1(LED1); // this led toggles when a packet is received
+DigitalOut ledR(LED_RED);
+DigitalOut ledG(LED_GREEN);
+DigitalOut ledB(LED_BLUE);
+DigitalOut ledD(LED_DEBUG);
 
 // the standard hdlc frame start/end character. It's the tilde character "~"
 #define FRAME_7E (0x7e)
@@ -170,7 +140,10 @@ void pppInitStruct()
     ppp.rx.buflevel=0;
     ppp.pkt.len=0;
     ppp.ipData.ident=10000; // easy to recognize in ip packet dumps
-    ppp.ledState=0;
+    ppp.led1State=1;
+		ppp.led2State=1;
+		ppp.led3State=0;
+		ppp.led4State=0;
     ppp.hdlc.frameStartIndex=0;
     ppp.responseCounter=0;
     ppp.firstFrame=1;
@@ -179,10 +152,12 @@ void pppInitStruct()
 }
 
 /// Toggle the LED on every second PPP packet received
-void led1Toggle()
+void initialiseLEDs()
 {
-    led1 = (ppp.ledState >> 1) & 1; // use second bit, in other words toggle LED only every second packet
-    ppp.ledState++;
+	ledR = 1;
+	ledG = 1;
+	ledB = 1;
+	ledD = 1;
 }
 
 /// Returns 1 after a connect message, 0 at startup or after a disconnect message
@@ -296,7 +271,6 @@ void dumpPPPFrame()
 /// Process a received PPP frame
 void processPPPFrame(int start, int end)
 {
-    led1Toggle(); // change led1 state on every frame we receive
     if(start==end) {
         return; // empty frame
     }
@@ -732,10 +706,10 @@ void ICMPpacket()   // internet control message protocol
 }
 
 /// handle an IGMP (internet group managment protocol) packet (by ignoring it)
-/*void IGMPpacket()
+void IGMPpacket()
 {
     if (v0) debugPrintf("IGMP type=%d \n", ppp.pkt.buf[28]);
-}*/
+}
 
 /// dump the header of an IP pakcet on the (optional) debug serial port
 void dumpHeaderIP (int outGoing)
@@ -879,13 +853,15 @@ int httpResponse(char * dataStart, int * flags)
 
     int nHeader; // byte size of HTTP header
     int contentLengthStart; // index where HTML starts
-    int httpGet5,httpGet6,httpGetx, httpGetRoot; // temporary storage of strncmp results
+    int httpGet5,httpGet6,httpGet7, httpGetx, httpGetRoot; // temporary storage of strncmp results
     *flags = TCP_FLAG_ACK | TCP_FLAG_FIN; // the default case is that we close the connection
 
     httpGetRoot = strncmp(dataStart, "GET / HTTP/1.", 13);  // found a GET to the root directory
     httpGetx    = strncmp(dataStart, "GET /x", 6);          // found a GET to /x which we will treat special (anything starting with /x, e.g. /x, /xyz, /xABC?pqr=123
-    httpGet5    = dataStart[5]; // the first character in the path name, we use it for special functions later on
-    httpGet6    = dataStart[6]; // the second character in the path name, we use it for special functions later on
+    httpGet5    = dataStart[5]; // the first character in the path name, (local, or remote board?)
+    httpGet6    = dataStart[6]; // the second character in the path name, (what is the function?)
+    httpGet7    = dataStart[7]; // the third character in the path name, (parameter to that function)
+	
     // for example, you could try this using netcat (nc):    echo "GET /x" | nc 172.10.10.2
     if( (httpGetRoot==0) || (httpGetx==0) ) {
         n=n+sprintf(n+dataStart,"HTTP/1.1 200 OK\r\nServer: mbed-PPP-Blinky-v1\r\n"); // 200 OK header
@@ -904,9 +880,34 @@ int httpResponse(char * dataStart, int * flags)
         memcpy(n+dataStart,rootWebPage,sizeof(rootWebPage));
         n = n + sizeof(rootWebPage)-1; // one less than sizeof because we don't count the null byte at the end
 
-    } else if ( (httpGet5 == 'w') && (httpGet6 == 's') ) { // "ws" is a special page for websocket demo
-        //memcpy(n+dataStart,webSocketPage,sizeof(webSocketPage));
-        //n = n + sizeof(webSocketPage)-1; // one less than size
+    } else if (httpGet5 == 'l') { // applying locally
+				// keep the webpage the same
+				memcpy(n+dataStart,rootWebPage,sizeof(rootWebPage));
+				n = n + sizeof(rootWebPage)-1; // one less than size
+			
+				if (httpGet6 == 'l') { // turn on an LED
+					
+					switch (httpGet7) { // landme
+						case '1':
+							ledR == 0 ? ledR = 1 : ledR = 0;
+						break;
+						case '2':
+							ledG == 0 ? ledG = 1 : ledG = 0;
+						break;
+						case '3':
+							ledB == 0 ? ledB = 1 : ledB = 0;
+						break;
+						case '4':
+							ledD == 0 ? ledD = 1 : ledD = 0;
+						break;
+					}
+				} else if (httpGet6 == 'r'){
+					ledR = 1;
+					ledG = 1;
+					ledB = 1;
+					ledD = 1;
+				}
+				
         //*flags = TCP_FLAG_ACK | TCP_FLAG_PSH; // for a websocket page we do NOT close the connection
     } else {
         if (httpGetx == 0) { // the page request started with "GET /x" - here we treat anything starting with /x special:
@@ -1109,7 +1110,7 @@ void IPframe()
             ICMPpacket();
             break;
         case    2:
-            //IGMPpacket();
+            IGMPpacket();
             break;
         case   17:
             UDPpacket();
